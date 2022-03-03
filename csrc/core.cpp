@@ -46,11 +46,12 @@ nfft_adjoint(
     torch::Tensor x,
     torch::optional<torch::Tensor> opt_batch,
     int64_t N,
-    int64_t m)
+    int64_t m,
+    int64_t real_output)
 {
     AT_ASSERTM(x.device().is_cuda(), "torch_nfft.nfft_adjoint is currently only implemented for GPU tensors");
 
-    return nfft_adjoint_cuda(pos, x, opt_batch, N, m);
+    return nfft_adjoint_cuda(pos, x, opt_batch, N, m, real_output);
 }
 
 
@@ -91,14 +92,15 @@ nfft_adjoint(
 */
 torch::Tensor
 nfft_forward(
-    torch::Tensor targets,
+    torch::Tensor pos,
     torch::Tensor x,
-    torch::optional<torch::Tensor> opt_target_ptr,
-    double tol)
+    torch::optional<torch::Tensor> opt_batch,
+    int64_t m,
+    int64_t real_output)
 {
     AT_ASSERTM(x.device().is_cuda(), "torch_nfft.nfft_forward is currently only implemented for GPU tensors");
 
-    return nfft_forward_cuda(targets, x, opt_target_ptr, tol);
+    return nfft_forward_cuda(pos, x, opt_batch, m, real_output);
 }
 
 // Register operators for torch
