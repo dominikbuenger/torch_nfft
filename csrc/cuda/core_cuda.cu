@@ -12,7 +12,7 @@
 #include "window_operations.cu"
 #include "adjoint_window_operations.cu"
 
-#define PI                  3.141592653589793115997963468544185161590576171875f
+#define PI 3.141592653589793115997963468544185161590576171875f
 
 
 
@@ -50,7 +50,111 @@ print_g_hat_slice_2d_kernel(
         }
     }
 }
-#endif
+
+#endif // NFFT_PRINT_DEBUG
+
+
+__host__ void
+check_point_input(
+    const torch::Tensor pos,
+    const torch::optional<torch::Tensor> optional_batch,
+    int *out_dim,
+    int64_t *out_num_points,
+    int64_t *out_batch_size,
+    torch::Tensor *out_batch)
+{
+    CHECK_CUDA(pos);
+    CHECK_INPUT(pos.dim() == 2);
+    CHECK_INPUT(pos.scalar_type() == at::ScalarType::Float);
+
+    *out_num_points = pos.size(0);
+    *out_dim = pos.size(1);
+    CHECK_INPUT(*out_dim >= 1 && *out_dim <= 3);
+
+    if (optional_batch.has_value()) {
+        *out_batch = optional_batch.value();
+        CHECK_CUDA((*out_batch));
+        CHECK_INPUT(out_batch->dim() == 1);
+        CHECK_INPUT(out_batch->scalar_type() == at::ScalarType::Long);
+        *out_batch_size = out_batch->index({-1}).item().to<int64_t>() + 1;
+    }
+    else {
+        *out_batch = torch::zeros({*out_num_points}, pos.options().dtype(torch::kLong));
+        *out_batch_size = 1;
+    }
+}
+
+
+__host__ void
+check_spatial_coeffs_input(
+    const torch::Tensor x,
+    const int64_t num_points,
+    int *out_real_input,
+    int64_t *out_num_columns)
+{
+    CHECK_CUDA(x);
+
+    *out_real_input = (x.scalar_type() == at::ScalarType::Float);
+    if (!(*out_real_input))
+        CHECK_INPUT(x.scalar_type() == at::ScalarType::ComplexFloat);
+
+    CHECK_INPUT(x.dim() >= 1);
+    CHECK_INPUT(x.size(0) == num_points);
+    *out_num_columns = x.numel() / num_points;
+
+}
+
+
+__host__ void
+check_spectral_coeffs_input(
+    const torch::Tensor x,
+    const int dim,
+    const int64_t batch_size,
+    int *out_real_input,
+    int64_t *out_N,
+    int64_t *out_num_columns)
+{
+    CHECK_CUDA(x);
+
+    *out_real_input = (x.scalar_type() == at::ScalarType::Float);
+    if (!(*out_real_input))
+        CHECK_INPUT(x.scalar_type() == at::ScalarType::ComplexFloat);
+
+    CHECK_INPUT(x.dim() >= dim + 1);
+    CHECK_INPUT(x.size(0) == batch_size);
+
+    *out_N = x.size(1);
+    CHECK_INPUT(*out_N >= 2);
+
+    *out_num_columns = x.numel() / (batch_size * (*out_N));
+    for (int d=2; d<dim+1; ++d) {
+        CHECK_INPUT(x.size(d) == *out_N);
+        *out_num_columns /= *out_N;
+    }
+}
+
+
+__host__ void
+setup_spectral_dimensions(
+    int64_t N,
+    int64_t m,
+    int dim,
+    int *out_M_array,
+    int64_t *out_prod_N,
+    int64_t *out_prod_M,
+    int64_t *out_window_volume)
+{
+    *out_prod_M = 1;
+    *out_prod_N = 1;
+    *out_window_volume = 1;
+    for (int d=0; d<dim; ++d) {
+        out_M_array[d] = 2*N;
+        *out_prod_M *= 2*N;
+        *out_prod_N *= N;
+        *out_window_volume *= 2*m+2;
+    }
+}
+
 
 /**
     Main function for Adjoint NFFT on GPU
@@ -65,63 +169,29 @@ nfft_adjoint_cuda(
     const int64_t m,
     const int64_t real_output)
 {
-
-    CHECK_CUDA(sources);
-    CHECK_CUDA(x);
-    cudaSetDevice(x.get_device());
-
-    int64_t real_input = (x.scalar_type() == at::ScalarType::Float);
-    if (!real_input)
-        CHECK_INPUT(x.scalar_type() == at::ScalarType::ComplexFloat);
-
-    CHECK_INPUT(sources.dim() == 2);
-    CHECK_INPUT(sources.scalar_type() == at::ScalarType::Float);
-
-    int dim = sources.size(1);
-    CHECK_INPUT(dim >= 1 && dim <= 3);
-
-    int64_t num_sources_total = sources.size(0);
-
-    int batch_size = 1;
+    int dim;
+    int64_t batch_size;
+    int64_t num_sources_total;
     torch::Tensor source_batch;
-    if (opt_source_batch.has_value()) {
-        source_batch = opt_source_batch.value();
-        CHECK_CUDA(source_batch);
-        CHECK_INPUT(source_batch.dim() == 1);
-        CHECK_INPUT(source_batch.scalar_type() == at::ScalarType::Long);
-        batch_size = source_batch.index({-1}).item().to<int>() + 1;
-    } else {
-        source_batch = torch::zeros({num_sources_total}, sources.options().dtype(torch::kLong));
-    }
+    check_point_input(sources, opt_source_batch,
+        &dim, &num_sources_total, &batch_size, &source_batch);
 
-    // Check size of x
-    CHECK_INPUT(x.dim() >= 1);
-    CHECK_INPUT(x.size(0) == num_sources_total);
-    int64_t num_columns = x.numel() / num_sources_total;
+    int real_input;
+    int64_t num_columns;
+    check_spatial_coeffs_input(x, num_sources_total,
+        &real_input, &num_columns);
 
-    // Prepare frequency domain size parameters
-    int M_array[3] = {1,1,1};
-    int prod_N = 1;
-    int prod_M = 1;
-    int64_t window_length = 2*m+2;
-    int64_t window_volume = 1;
-    for (int d=0; d<dim; ++d) {
-        M_array[d] = 2*N;
-        prod_N *= N;
-        prod_M *= 2*N;
-        window_volume *= window_length;
-    }
-
-    // Prepare parameters for Gaussian window function
-    // const float window_inv_b = THREE_QUARTER_PI / m;
-    // const float window_inv_sqrt_b_pi = sqrtf(0.75f / m);
-    // const float window_b_square_pi_over_M = PI_THIRD * m / (N*N);
-    const float window_inv_b                = WINDOW_FORWARD_PARAM1(N, m);
-    const float window_inv_sqrt_b_pi        = WINDOW_FORWARD_PARAM2(N, m);
-    const float window_b_square_pi_over_M   = WINDOW_ADJOINT_PARAM(N, m);
-
+    cudaSetDevice(x.get_device());
     auto stream = at::cuda::getCurrentCUDAStream();
     dim3 gridDim, blockDim;
+
+    int M_array[3];
+    int64_t prod_N;
+    int64_t prod_M;
+    int64_t window_volume;
+    setup_spectral_dimensions(N, m, dim,
+        M_array, &prod_N, &prod_M, &window_volume);
+
 
 #ifdef NFFT_PRINT_DEBUG
     printf("Point dimension: %d\n", dim);
@@ -144,22 +214,20 @@ nfft_adjoint_cuda(
         2*N, m,
         dim, num_sources_total);
 
-    gpuErrchk( cudaPeekAtLastError() );
-    gpuErrchk( cudaDeviceSynchronize() );
+    CHECK_ERRORS();
 
     float *source_psi;
-    cudaMalloc(&source_psi, num_sources_total*dim*window_length*sizeof(float));
+    cudaMalloc(&source_psi, num_sources_total*dim*(2*m+2)*sizeof(float));
 
-    setupGrid(&gridDim, &blockDim, num_sources_total, window_length, dim);
+    setupGrid(&gridDim, &blockDim, num_sources_total, 2*m+2, dim);
     compute_psi_kernel<<<gridDim, blockDim, 0, stream>>>(
         sources.packed_accessor64<float,2>(),
         source_shifts,
         source_psi,
-        dim, num_sources_total, N, window_length,
-        window_inv_b, window_inv_sqrt_b_pi);
+        dim, num_sources_total, N, 2*m+2,
+        WINDOW_FORWARD_PARAM1(N, m), WINDOW_FORWARD_PARAM2(N, m));
 
-    gpuErrchk( cudaPeekAtLastError() );
-    gpuErrchk( cudaDeviceSynchronize() );
+    CHECK_ERRORS();
 
 /// COMPUTE g    (convolution with window function)
 
@@ -178,7 +246,7 @@ nfft_adjoint_cuda(
             source_psi,
             g,
             dim, num_sources_total, num_columns,
-            2*N, window_length, window_volume);
+            2*N, 2*m+2, window_volume);
     }
     else {
         complex_adjoint_window_convolution_kernel<<<gridDim, blockDim, 0, stream>>>(
@@ -188,11 +256,10 @@ nfft_adjoint_cuda(
             source_psi,
             g,
             dim, num_sources_total, num_columns,
-            2*N, window_length, window_volume);
+            2*N, 2*m+2, window_volume);
     }
 
-    gpuErrchk( cudaPeekAtLastError() );
-    gpuErrchk( cudaDeviceSynchronize() );
+    CHECK_ERRORS();
 
 /// EXECUTE FFT
 
@@ -240,10 +307,9 @@ nfft_adjoint_cuda(
 
     setupGrid(&gridDim, &blockDim, N/2+1);
     compute_phi_hat_inv_kernel<<<gridDim, blockDim, 0, stream>>>(
-        phi_hat_inv, N/2, window_b_square_pi_over_M);
+        phi_hat_inv, N/2, WINDOW_ADJOINT_PARAM(N, m));
 
-    gpuErrchk( cudaPeekAtLastError() );
-    gpuErrchk( cudaDeviceSynchronize() );
+    CHECK_ERRORS();
 
 /// PREPARE OUTPUT
 
@@ -368,7 +434,7 @@ forward_window_convolution_kernel(
     const float *point_psi,
     const cufftReal *g,
     const int64_t dim, const int64_t num_points, const int64_t num_columns,
-    const int64_t M, const int64_t window_length, const int64_t window_volume,
+    const int64_t M, const int64_t 2*m+2, const int64_t window_volume,
     const int64_t signal_dist)
 {
     int64_t point_idx, batch_idx, column_idx, window_idx, w, freq_idx, d;

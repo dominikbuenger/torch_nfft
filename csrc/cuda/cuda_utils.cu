@@ -13,6 +13,8 @@ inline void gpuAssert(cudaError_t code, const char *file, int line, bool abort=t
    }
 }
 
+#define CHECK_ERRORS() { gpuErrchk(cudaPeekAtLastError()); gpuErrchk(cudaDeviceSynchronize()); }
+
 /**
     Auxiliary function to setup two dim3 variables to be used in kernel calls.
 
