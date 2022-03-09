@@ -40,7 +40,7 @@ print("y_nfft shape: ", y_nfft.shape)
 y_ndft = torch.cat([ndft_forward(x[...,i], pos, batch)[...,None] for i in range(c)], dim=-1)
 # print("Exact:")
 # print(y_ndft)
-print("y_ndft shape: ", y_nfft.shape)
+print("y_ndft shape: ", y_ndft.shape)
 
 print("Difference between fast and exact:")
 print("L1 norm:", torch.abs(y_nfft - y_ndft).sum().item())

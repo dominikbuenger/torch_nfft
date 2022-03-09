@@ -60,7 +60,7 @@ def ndft_forward(x, pos, batch=None):
         return torch.tensordot(fourier_tensor, x_part, dims=d)
 
     if batch is None:
-        return single_ndft(x, pos)
+        return single_ndft(x[0], pos)
 
     else:
         batch_size = batch.max().item() + 1
