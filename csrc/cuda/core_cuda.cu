@@ -8,6 +8,8 @@
 #include <complex.h>
 #include <cufft.h>
 
+// #define NFFT_PRINT_DEBUG
+
 #include "cuda_utils.cu"
 #include "window_operations.cu"
 #include "adjoint_window_operations.cu"
@@ -18,7 +20,6 @@
 
 
 #ifdef NFFT_PRINT_DEBUG
-
 // for debugging purposes only
 __global__ void
 print_g_slice_2d_kernel(
@@ -34,23 +35,6 @@ print_g_slice_2d_kernel(
         }
     }
 }
-
-// for debugging purposes only
-__global__ void
-print_g_hat_slice_2d_kernel(
-    const cufftComplex* g_hat,
-    const int64_t M)
-{
-    int64_t f;
-
-    if (blockIdx.x == 0 && threadIdx.x == 0) {
-        for (f=0; f < M*M; ++f) {
-            printf(" - g_hat[0,0,%ld,%ld,0] = %f + %fi\n",
-                f / M, f % M, cuCrealf(g_hat[f]), cuCimagf(g_hat[f]));
-        }
-    }
-}
-
 #endif // NFFT_PRINT_DEBUG
 
 
@@ -197,7 +181,7 @@ nfft_adjoint_cuda(
     printf("Point dimension: %d\n", dim);
     printf("Total number of source points: %ld\n", num_sources_total);
     printf("Number of columns: %ld\n", num_columns);
-    printf("Batch size: %d\n", batch_size);
+    printf("Batch size: %ld\n", batch_size);
     printf("M_array: %d %d %d\n", M_array[0], M_array[1], M_array[2]);
 #endif
 
@@ -266,8 +250,7 @@ nfft_adjoint_cuda(
 #ifdef NFFT_PRINT_DEBUG
     if (dim == 2) {
         print_g_slice_2d_kernel<<<1,1,0,stream>>>(g, 2*N);
-        gpuErrchk( cudaPeekAtLastError() );
-        gpuErrchk( cudaDeviceSynchronize() );
+        CHECK_ERRORS();
     }
 #endif
 
@@ -287,16 +270,14 @@ nfft_adjoint_cuda(
     AT_ASSERTM(cufftExecC2C(plan, g, g, CUFFT_INVERSE)
                 == CUFFT_SUCCESS, "Failed to execute CUFFT plan");
 
-    gpuErrchk( cudaPeekAtLastError() );
-    gpuErrchk( cudaDeviceSynchronize() );
+    CHECK_ERRORS();
 
     cufftDestroy(plan);
 
 #ifdef NFFT_PRINT_DEBUG
     if (dim == 2) {
-        print_g_hat_slice_2d_kernel<<<1,1,0,stream>>>(g, 2*N);
-        gpuErrchk( cudaPeekAtLastError() );
-        gpuErrchk( cudaDeviceSynchronize() );
+        print_g_slice_2d_kernel<<<1,1,0,stream>>>(g, 2*N);
+        CHECK_ERRORS();
     }
 #endif
 
@@ -396,7 +377,7 @@ nfft_forward_cuda(
     printf("Point dimension: %d\n", dim);
     printf("Total number of target points: %ld\n", num_targets_total);
     printf("Number of columns: %ld\n", num_columns);
-    printf("Batch size: %d\n", batch_size);
+    printf("Batch size: %ld\n", batch_size);
     printf("M_array: %d %d %d\n", M_array[0], M_array[1], M_array[2]);
 #endif
 
@@ -446,7 +427,7 @@ nfft_forward_cuda(
 
 #ifdef NFFT_PRINT_DEBUG
     if (dim == 2) {
-        print_g_hat_slice_2d_kernel<<<1,1,0,stream>>>(g_hat, N);
+        print_g_slice_2d_kernel<<<1,1,0,stream>>>(g, 2*N);
         CHECK_ERRORS();
     }
 #endif
@@ -511,7 +492,7 @@ nfft_forward_cuda(
     std::vector<int64_t> y_sizes(x.dim()-dim);
     y_sizes[0] = num_targets_total;
     for (int d=0; d<x.dim()-dim-1; ++d)
-        y_sizes[1+dim+d] = x.size(d+1);
+        y_sizes[1+d] = x.size(1+dim+d);
 
 
     auto y = torch::zeros(y_sizes, x.options().dtype(
