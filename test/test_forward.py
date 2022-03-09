@@ -43,6 +43,9 @@ y_ndft = torch.cat([ndft_forward(x[...,i], pos, batch)[...,None] for i in range(
 print("y_ndft shape: ", y_ndft.shape)
 
 print("Difference between fast and exact:")
-print("L1 norm:", torch.abs(y_nfft - y_ndft).sum().item())
-print("L2 norm:", torch.linalg.norm(y_nfft - y_ndft).item())
-print("Linf norm:", torch.abs(y_nfft - y_ndft).max().item())
+l1 = lambda v: torch.abs(v).sum().item()
+print("L1 norm: {:.2e} absolute / {:.2e} relative".format(l1(y_nfft - y_ndft), l1(y_nfft - y_ndft) / l1(y_ndft)))
+l2 = lambda v: torch.linalg.norm(v).item()
+print("L2 norm: {:.2e} absolute / {:.2e} relative".format(l2(y_nfft - y_ndft), l2(y_nfft - y_ndft) / l2(y_ndft)))
+linf = lambda v: torch.abs(v).max().item()
+print("Linf norm: {:.2e} absolute / {:.2e} relative".format(linf(y_nfft - y_ndft), linf(y_nfft - y_ndft) / linf(y_ndft)))
