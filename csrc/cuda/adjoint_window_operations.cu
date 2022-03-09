@@ -152,3 +152,115 @@ real_adjoint_rolloff_correction_kernel(
         }
     }
 }
+
+
+
+
+__global__ void
+complex_forward_rolloff_correction_kernel(
+    const torch::PackedTensorAccessor64<c10::complex<float>,3> x_acc, // size batch_size x prod_N x num_columns
+    cufftComplex *g_hat, // size batch_size * num_columns * prod_M
+    const float *phi_hat_inv, // size N/2 + 1
+    const int64_t dim, const int64_t batch_size, const int64_t num_columns,
+    const int64_t N, const int64_t halfN, const int64_t prod_N)
+{
+    int64_t batch_idx, freq_idx, reverse_freq_idx, f, column_idx, g_hat_idx, d;
+    float factor;
+
+    for (batch_idx=blockIdx.z*blockDim.z + threadIdx.z; batch_idx < batch_size; batch_idx += gridDim.z*blockDim.z)
+    {
+        for (column_idx = blockIdx.y*blockDim.y + threadIdx.y; column_idx < num_columns; column_idx += gridDim.y*blockDim.y)
+        {
+            for (reverse_freq_idx = blockIdx.x*blockDim.x + threadIdx.x; reverse_freq_idx < prod_N; reverse_freq_idx += gridDim.x*blockDim.x)
+            {
+                factor = 1.0f;
+                // we actually iterate over the frequency indices in reverse order:
+                //   reverse_freq_idx = ((i[dim-1]*N + i[dim-2])*N + ...)*N + i[0]
+                // so we can obtain the current i[d] as f % N if we always shave off f /= N in each iteration.
+                // Here i[d] in [0,N-1] corresponds to the frequency i[d]-N/2 in [-N/2,N/2-1].
+                f = reverse_freq_idx;
+                // But for the index in x, we need to also build the original
+                //   freq_idx = ((i[0]*N + i[1])*N + ...)*N + i[dim-1]
+                freq_idx = 0;
+                // The correct index can be computed iteratively:
+                //   g_hat_idx = ((((batch_idx*num_columns + column_idx)*M + i[0])*M + i[0])*M + ...)*(N+1) * i[dim-1])
+                g_hat_idx = batch_idx*num_columns + column_idx;
+                for (d=0; d<dim; ++d)
+                {
+                    freq_idx = freq_idx*N + (f % N);
+                    if (f % N < halfN) {
+                        // first half: actual frequency (f % N) - halfN is negative
+                        // g_hat value is stored in the end part
+                        g_hat_idx = g_hat_idx*2*N + 2*N + (f % N) - halfN;
+                        // phi_hat value is stored at absolute value of actual frequency
+                        factor *= phi_hat_inv[halfN - (f % N)];
+                    }
+                    else {
+                        // second half: actual frequency (f % N) - halfN is non-negative
+                        // g_hat value is stored in the first part
+                        g_hat_idx = g_hat_idx*2*N + (f % N) - halfN;
+                        // phi_hat value is stored at actual frequency
+                        factor *= phi_hat_inv[(f % N) - halfN];
+                    }
+                    f /= N;
+                }
+
+
+                g_hat[g_hat_idx] = make_cuFloatComplex(x_acc[batch_idx][freq_idx][column_idx].real() * factor,
+                                                        x_acc[batch_idx][freq_idx][column_idx].imag() * factor);
+
+#ifdef NFFT_PRINT_DEBUG
+                if (batch_idx == 0 && column_idx == 0)
+                    printf(" - g_hat in oversampled frequency [%ld, %ld, %ld], original frequency [%ld, %ld, %ld]:  g_hat=%f + %fi, factor=%f\n",
+                            g_hat_idx / (2*N*(N+1)), (g_hat_idx / (N+1)) % (2*N), g_hat_idx % (N+1),
+                            reverse_freq_idx % N, (reverse_freq_idx / N) % N, reverse_freq_idx / (N * N),
+                            cuCrealf(g_hat[g_hat_idx]), cuCimagf(g_hat[g_hat_idx]), factor);
+#endif
+            }
+        }
+    }
+}
+
+
+// Variant of complex_forward_rolloff_correction_kernel for real-valued tensor x
+__global__ void
+real_forward_rolloff_correction_kernel(
+    const torch::PackedTensorAccessor64<float,3> x_acc, // size batch_size x prod_N x num_columns
+    cufftComplex *g_hat, // size batch_size * num_columns * prod_M
+    const float *phi_hat_inv, // size N/2 + 1
+    const int64_t dim, const int64_t batch_size, const int64_t num_columns,
+    const int64_t N, const int64_t halfN, const int64_t prod_N)
+{
+    int64_t batch_idx, freq_idx, reverse_freq_idx, f, column_idx, g_hat_idx, d;
+    float factor;
+
+    for (batch_idx=blockIdx.z*blockDim.z + threadIdx.z; batch_idx < batch_size; batch_idx += gridDim.z*blockDim.z)
+    {
+        for (column_idx = blockIdx.y*blockDim.y + threadIdx.y; column_idx < num_columns; column_idx += gridDim.y*blockDim.y)
+        {
+            for (reverse_freq_idx = blockIdx.x*blockDim.x + threadIdx.x; reverse_freq_idx < prod_N; reverse_freq_idx += gridDim.x*blockDim.x)
+            {
+                factor = 1.0f;
+                f = reverse_freq_idx;
+                freq_idx = 0;
+                g_hat_idx = batch_idx*num_columns + column_idx;
+                for (d=0; d<dim; ++d)
+                {
+                    freq_idx = freq_idx*N + (f % N);
+                    if (f % N < halfN) {
+                        g_hat_idx = g_hat_idx*2*N + 2*N + (f % N) - halfN;
+                        factor *= phi_hat_inv[halfN - (f % N)];
+                    }
+                    else {
+                        g_hat_idx = g_hat_idx*2*N + (f % N) - halfN;
+                        factor *= phi_hat_inv[(f % N) - halfN];
+                    }
+                    f /= N;
+                }
+
+
+                g_hat[g_hat_idx] = make_cuFloatComplex(x_acc[batch_idx][freq_idx][column_idx] * factor, 0.0f);
+            }
+        }
+    }
+}

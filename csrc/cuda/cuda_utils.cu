@@ -61,3 +61,24 @@ atomicAddComplex(cufftComplex *target, cufftComplex value)
     atomicAdd((float*)target, cuCrealf(value));
     atomicAdd(((float*)target) + 1, cuCimagf(value));
 }
+
+
+__device__ __forceinline__ void
+atomicAddComplex(c10::complex<float> *target, float re)
+{
+    atomicAdd((float*)target, re);
+}
+
+__device__ __forceinline__ void
+atomicAddComplex(c10::complex<float> *target, float re, float im)
+{
+    atomicAdd((float*)target, re);
+    atomicAdd(((float*)target) + 1, im);
+}
+
+__device__ __forceinline__ void
+atomicAddComplex(c10::complex<float> *target, cufftComplex value)
+{
+    atomicAdd((float*)target, cuCrealf(value));
+    atomicAdd(((float*)target) + 1, cuCimagf(value));
+}

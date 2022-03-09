@@ -90,6 +90,7 @@ nfft_adjoint(
     The cutoff parameter m controls the approximation quality and must be in
         1 <= m < N/2.
 */
+
 torch::Tensor
 nfft_forward(
     torch::Tensor pos,
@@ -102,6 +103,7 @@ nfft_forward(
 
     return nfft_forward_cuda(pos, x, opt_batch, m, real_output);
 }
+
 
 // Register operators for torch
 static auto registry = torch::RegisterOperators()
