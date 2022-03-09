@@ -267,15 +267,14 @@ complex_forward_window_convolution_kernel(
                 atomicAddComplex(&(y_acc[point_idx][column_idx]), factor*cuCrealf(g[g_idx]), factor*cuCimagf(g[g_idx]));
 
 #ifdef NFFT_PRINT_DEBUG
-                if (freq_idx == 0)
-                    printf(" - Contribution of g[%ld, %ld, %ld, %ld, %ld]=%f to output y[%ld,%ld]: %f\n",
+                if (batch_idx == 0 && column_idx == 0)
+                    printf(" - Contribution of g[%ld, %ld, %ld, %ld, %ld] to output y[%ld,%ld]: %f * (%f + %fi)\n",
                         batch_idx, column_idx,
                         (point_shifts[point_idx*dim + 0] + (window_idx % window_length) + M) % M,
                         dim > 1 ? (point_shifts[point_idx*dim + 1] + ((window_idx / window_length) % window_length) + M) % M : 0,
                         dim > 2 ? (point_shifts[point_idx*dim + 2] + (window_idx / (window_length * window_length)) + M) % M : 0,
-                        g[(batch_idx*num_columns + column_idx)*signal_dist + freq_idx],
-                        point_idx, column_idx, x_acc[point_idx][column_idx], freq_idx,
-                        value);
+                        point_idx, column_idx,
+                        factor, cuCrealf(g[g_idx]), cuCimagf(g[g_idx]));
 #endif
             }
         }
@@ -318,15 +317,14 @@ real_forward_window_convolution_kernel(
                 atomicAdd(&(y_acc[point_idx][column_idx]), factor*cuCrealf(g[g_idx]));
 
 #ifdef NFFT_PRINT_DEBUG
-                if (freq_idx == 0)
-                    printf(" - Contribution of g[%ld, %ld, %ld, %ld, %ld]=%f to output y[%ld,%ld]: %f\n",
+                if (batch_idx == 0 && column_idx == 0)
+                    printf(" - Contribution of g[%ld, %ld, %ld, %ld, %ld] to output y[%ld,%ld]: %f * %f\n",
                         batch_idx, column_idx,
                         (point_shifts[point_idx*dim + 0] + (window_idx % window_length) + M) % M,
                         dim > 1 ? (point_shifts[point_idx*dim + 1] + ((window_idx / window_length) % window_length) + M) % M : 0,
                         dim > 2 ? (point_shifts[point_idx*dim + 2] + (window_idx / (window_length * window_length)) + M) % M : 0,
-                        g[(batch_idx*num_columns + column_idx)*signal_dist + freq_idx],
-                        point_idx, column_idx, x_acc[point_idx][column_idx], freq_idx,
-                        value);
+                        point_idx, column_idx,
+                        factor, cuCrealf(g[g_idx]));
 #endif
             }
         }
