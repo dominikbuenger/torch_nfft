@@ -20,3 +20,15 @@ nfft_forward_cuda(
     torch::optional<torch::Tensor> opt_batch,
     int64_t m,
     int64_t real_output);
+
+
+torch::Tensor
+nfft_fastsum_cuda(
+    const torch::Tensor sources,
+    const torch::Tensor targets,
+    const torch::Tensor x,
+    const torch::Tensor coeffs,
+    const torch::optional<torch::Tensor> opt_source_batch,
+    const torch::optional<torch::Tensor> opt_target_batch,
+    const int64_t N,
+    const int64_t m);

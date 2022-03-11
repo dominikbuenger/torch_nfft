@@ -264,3 +264,135 @@ real_forward_rolloff_correction_kernel(
         }
     }
 }
+
+
+
+__global__ void
+complex_kernel_convolution_kernel(
+    const torch::PackedTensorAccessor64<c10::complex<float>,1> coeffs_acc,
+    cufftComplex *g_hat, // size batch_size * num_columns * prod_M
+    const float *phi_hat_inv, // size N/2 + 1
+    const int64_t dim, const int64_t batch_size, const int64_t num_columns,
+    const int64_t M, const int64_t halfN, const int64_t prod_M)
+{
+    int64_t batch_idx, column_idx, reverse_freq_idx, coeff_idx, g_hat_idx, f, d;
+    float factor;
+    c10::complex<float> coeff;
+
+    for (batch_idx=blockIdx.z*blockDim.z + threadIdx.z; batch_idx < batch_size; batch_idx += gridDim.z*blockDim.z)
+    {
+        for (column_idx = blockIdx.y*blockDim.y + threadIdx.y; column_idx < num_columns; column_idx += gridDim.y*blockDim.y)
+        {
+            for (reverse_freq_idx = blockIdx.x*blockDim.x + threadIdx.x; reverse_freq_idx < prod_M; reverse_freq_idx += gridDim.x*blockDim.x)
+            {
+                factor = 1.0f;
+                coeff_idx = 0;
+                g_hat_idx = batch_idx*num_columns + column_idx;
+
+                for (d=0; d<dim; ++d) {
+                    // a coeff_idx below zero indicates that this part of g_hat
+                    // is set to zero and there is no fitting coefficient
+                    if (coeff_idx >= 0) {
+                        if (f % M < halfN) {
+                            // First quarter of g_hat: refers to positive actual
+                            // frequency (f % M) in [0,...,halfN-1]
+                            // coefficient is stored in second half of coeffs
+                            coeff_idx = 2*halfN*coeff_idx + halfN + (f % M);
+                            // phi_hat value is stored in the actual frequency index
+                            factor *= phi_hat_inv[f % M];
+                        }
+                        else if (f % M >= 3*halfN) {
+                            // Last quarter of g_hat: refers to negative actual
+                            // frequency (f % M) - M in [-halfN,...,-1]
+                            // coefficient stored in first half of coeffs
+                            coeff_idx = 2*halfN*coeff_idx + (f % M) - 3*halfN;
+                            // phi_hat value is stored in the absolute of the actual
+                            // frequency index, M - (f % M) in [1,...,halfN]
+                            factor *= phi_hat_inv[M - (f % M)];
+                        }
+                        else {
+                            coeff_idx = -1;
+                        }
+                    }
+
+                    g_hat_idx = M*g_hat_idx + (f % M);
+                }
+
+                if (coeff_idx < 0) {
+                    g_hat[g_hat_idx] = make_cuFloatComplex(0.0f, 0.0f);
+                }
+                else {
+                    coeff = coeffs_acc[coeff_idx];
+                    g_hat[g_hat_idx] = make_cuFloatComplex(
+                        factor * (cuCrealf(g_hat[g_hat_idx])*coeff.real() - cuCimagf(g_hat[g_hat_idx])*coeff.imag()),
+                        factor * (cuCrealf(g_hat[g_hat_idx])*coeff.imag() + cuCimagf(g_hat[g_hat_idx])*coeff.real()));
+                }
+            }
+        }
+    }
+}
+
+
+__global__ void
+real_kernel_convolution_kernel(
+    const torch::PackedTensorAccessor64<float,1> coeffs_acc,
+    cufftComplex *g_hat, // size batch_size * num_columns * prod_M
+    const float *phi_hat_inv, // size N/2 + 1
+    const int64_t dim, const int64_t batch_size, const int64_t num_columns,
+    const int64_t M, const int64_t halfN, const int64_t prod_M)
+{
+    int64_t batch_idx, column_idx, reverse_freq_idx, coeff_idx, g_hat_idx, f, d;
+    float factor;
+
+    for (batch_idx=blockIdx.z*blockDim.z + threadIdx.z; batch_idx < batch_size; batch_idx += gridDim.z*blockDim.z)
+    {
+        for (column_idx = blockIdx.y*blockDim.y + threadIdx.y; column_idx < num_columns; column_idx += gridDim.y*blockDim.y)
+        {
+            for (reverse_freq_idx = blockIdx.x*blockDim.x + threadIdx.x; reverse_freq_idx < prod_M; reverse_freq_idx += gridDim.x*blockDim.x)
+            {
+                factor = 1.0f;
+                coeff_idx = 0;
+                g_hat_idx = batch_idx*num_columns + column_idx;
+
+                for (d=0; d<dim; ++d) {
+                    // a coeff_idx below zero indicates that this part of g_hat
+                    // is set to zero and there is no fitting coefficient
+                    if (coeff_idx >= 0) {
+                        if (f % M < halfN) {
+                            // First quarter of g_hat: refers to positive actual
+                            // frequency (f % (2*N)) in [0,...,halfN-1]
+                            // coefficient is stored in second half of coeffs
+                            coeff_idx = 2*halfN*coeff_idx + halfN + (f % M);
+                            // phi_hat value is stored in the actual frequency index
+                            factor *= phi_hat_inv[f % M];
+                        }
+                        else if (f % M >= 3*halfN) {
+                            // Last quarter of g_hat: refers to negative actual
+                            // frequency (f % (2*N)) - 2*N in [-halfN,...,-1]
+                            // coefficient stored in first half of coeffs
+                            coeff_idx = 2*halfN*coeff_idx + (f % M) - 3*halfN;
+                            // phi_hat value is stored in the absolute of the actual
+                            // frequency index, 2*N - (f % (2*N)) in [1,...,halfN]
+                            factor *= phi_hat_inv[M - (f % M)];
+                        }
+                        else {
+                            coeff_idx = -1;
+                        }
+                    }
+
+                    g_hat_idx = M*g_hat_idx + (f % M);
+                }
+
+                if (coeff_idx < 0) {
+                    g_hat[g_hat_idx] = make_cuFloatComplex(0.0f, 0.0f);
+                }
+                else {
+                    factor *= coeffs_acc[coeff_idx];
+                    g_hat[g_hat_idx] = make_cuFloatComplex(
+                        factor * cuCrealf(g_hat[g_hat_idx]),
+                        factor * cuCimagf(g_hat[g_hat_idx]));
+                }
+            }
+        }
+    }
+}
