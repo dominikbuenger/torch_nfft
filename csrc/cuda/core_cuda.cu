@@ -11,8 +11,8 @@
 // #define NFFT_PRINT_DEBUG
 
 #include "cuda_utils.cu"
-#include "window_operations.cu"
-#include "adjoint_window_operations.cu"
+#include "spatial_window_operations.cu"
+#include "spectral_window_operations.cu"
 
 
 
