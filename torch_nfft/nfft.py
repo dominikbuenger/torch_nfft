@@ -2,7 +2,6 @@
 
 
 import torch
-import os
 
 _nfft_adjoint = torch.ops.torch_nfft.nfft_adjoint
 _nfft_forward = torch.ops.torch_nfft.nfft_forward

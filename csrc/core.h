@@ -35,6 +35,6 @@ nfft_fastsum(
 
 torch::Tensor
 gaussian_analytical_coeffs(
-    const float sigma,
+    const double sigma,
     const int64_t N,
     const int64_t dim);

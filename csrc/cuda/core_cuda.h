@@ -36,6 +36,6 @@ nfft_fastsum_cuda(
 
 torch::Tensor
 gaussian_analytical_coeffs_cuda(
-    const float sigma,
+    const double sigma,
     const int64_t N,
     const int64_t dim);

@@ -6,6 +6,8 @@ Created on Mon Jan 24 13:27:14 2022
 @author: dbunger
 """
 
+import torch
+import os
 torch.ops.load_library(os.path.join(os.path.dirname(os.path.realpath(__file__)), 'core.so'))
 
 
