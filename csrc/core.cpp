@@ -122,8 +122,19 @@ nfft_fastsum(
 }
 
 
+torch::Tensor
+gaussian_analytical_coeffs(
+    const float sigma,
+    const int64_t N,
+    const int64_t dim)
+{
+    return gaussian_analytical_coeffs_cuda(sigma, N, dim);
+}
+
+
 // Register operators for torch
 static auto registry = torch::RegisterOperators()
     .op("torch_nfft::nfft_adjoint", &nfft_adjoint)
     .op("torch_nfft::nfft_forward", &nfft_forward)
-    .op("torch_nfft::nfft_fastsum", &nfft_fastsum);
+    .op("torch_nfft::nfft_fastsum", &nfft_fastsum)
+    .op("torch_nfft::gaussian_analytical_coeffs", &gaussian_analytical_coeffs);

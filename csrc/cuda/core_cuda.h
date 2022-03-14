@@ -32,3 +32,10 @@ nfft_fastsum_cuda(
     const torch::optional<torch::Tensor> opt_target_batch,
     const int64_t N,
     const int64_t m);
+
+
+torch::Tensor
+gaussian_analytical_coeffs_cuda(
+    const float sigma,
+    const int64_t N,
+    const int64_t dim);

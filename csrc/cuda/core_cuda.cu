@@ -13,7 +13,7 @@
 #include "cuda_utils.cu"
 #include "spatial_window_operations.cu"
 #include "spectral_window_operations.cu"
-
+#include "kernel_coeffs.cu"
 
 
 #ifdef NFFT_PRINT_DEBUG
@@ -848,4 +848,30 @@ nfft_fastsum_cuda(
     cudaFree(phi_hat_inv);
 
     return y;
+}
+
+
+torch::Tensor
+gaussian_analytical_coeffs_cuda(
+    const float sigma,
+    const int64_t N,
+    const int64_t dim)
+{
+    int64_t prod_N = N;
+    for (int d=1; d<dim; ++d)
+        prod_N *= N;
+
+    std::vector<int64_t> coeffs_sizes = std::vector<int64_t>(dim, N);
+    torch::Tensor coeffs = torch::zeros(coeffs_sizes,
+        torch::TensorOptions().dtype(torch::kFloat32).device(torch::kCUDA));
+    torch::Tensor coeffs_reshaped = coeffs.view({prod_N});
+
+    dim3 gridDim, blockDim;
+    setupGrid(&gridDim, &blockDim, prod_N);
+
+    fill_gaussian_analytical_coeffs_kernel<<<gridDim, blockDim>>>(
+        coeffs_reshaped.packed_accessor64<float,1>(),
+        sigma, dim, N, prod_N);
+
+    return coeffs;
 }

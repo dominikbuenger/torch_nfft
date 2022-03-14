@@ -4,7 +4,6 @@
 import torch
 import os
 
-torch.ops.load_library(os.path.join(os.path.dirname(os.path.realpath(__file__)), 'core.so'))
 _nfft_adjoint = torch.ops.torch_nfft.nfft_adjoint
 _nfft_forward = torch.ops.torch_nfft.nfft_forward
 _nfft_fastsum = torch.ops.torch_nfft.nfft_fastsum
