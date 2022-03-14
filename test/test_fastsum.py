@@ -3,13 +3,13 @@
 import torch
 import math
 
-from torch_nfft import nfft_fastsum, ndft_fastsum
+from torch_nfft import nfft_fastsum, ndft_fastsum, gaussian_analytical_coeffs
 
 
 n = 5
 dim = 2
 c = 1
-sigma = 0.5
+sigma = 0.1
 N = 32
 m = 3
 
@@ -18,10 +18,12 @@ pos = torch.rand((n, dim)).cuda() - 0.5
 pos /= 4*torch.linalg.norm(pos, dim=1, keepdim=True)
 
 
-coeffs1d = sigma * math.sqrt(math.pi) * torch.exp(-(math.pi * sigma * torch.arange(-N//2, -N//2 + N).cuda()) ** 2)
-coeffs = torch.ones(*((N,)*dim)).cuda()
-for d in range(dim):
-    coeffs *= coeffs1d.view(N, *((1,)*d))
+# coeffs1d = sigma * math.sqrt(math.pi) * torch.exp(-(math.pi * sigma * torch.arange(-N//2, -N//2 + N).cuda()) ** 2)
+# coeffs = torch.ones(*((N,)*dim)).cuda()
+# for d in range(dim):
+#     coeffs *= coeffs1d.view(N, *((1,)*d))
+
+coeffs = gaussian_analytical_coeffs(sigma, dim=dim, N=N)
 
 
 A_nfft = nfft_fastsum(torch.eye(n).cuda(), coeffs, pos, N=N, m=m)
@@ -45,7 +47,6 @@ print()
 
 
 A_true = torch.exp(- (pos.reshape(1,n,dim) - pos.reshape(n,1,dim)).pow(2).sum(-1) / (sigma**2))
-y_true = A_true @ x
 
 print("True A:")
 print(A_true)
