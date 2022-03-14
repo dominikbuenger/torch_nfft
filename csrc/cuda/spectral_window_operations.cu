@@ -1,5 +1,4 @@
 
-
 #define PI_THIRD 1.047197551196597746154214461093167628065723133125f
 #define WINDOW_ADJOINT_PARAM(N,m) (PI_THIRD * m / (N*N))
 
@@ -289,6 +288,7 @@ complex_kernel_convolution_kernel(
                 coeff_idx = 0;
                 g_hat_idx = batch_idx*num_columns + column_idx;
 
+                f = reverse_freq_idx;
                 for (d=0; d<dim; ++d) {
                     // a coeff_idx below zero indicates that this part of g_hat
                     // is set to zero and there is no fitting coefficient
@@ -316,12 +316,14 @@ complex_kernel_convolution_kernel(
                     }
 
                     g_hat_idx = M*g_hat_idx + (f % M);
+                    f /= M;
                 }
 
                 if (coeff_idx < 0) {
                     g_hat[g_hat_idx] = make_cuFloatComplex(0.0f, 0.0f);
                 }
                 else {
+                    factor *= factor;
                     coeff = coeffs_acc[coeff_idx];
                     g_hat[g_hat_idx] = make_cuFloatComplex(
                         factor * (cuCrealf(g_hat[g_hat_idx])*coeff.real() - cuCimagf(g_hat[g_hat_idx])*coeff.imag()),
@@ -354,6 +356,7 @@ real_kernel_convolution_kernel(
                 coeff_idx = 0;
                 g_hat_idx = batch_idx*num_columns + column_idx;
 
+                f = reverse_freq_idx;
                 for (d=0; d<dim; ++d) {
                     // a coeff_idx below zero indicates that this part of g_hat
                     // is set to zero and there is no fitting coefficient
@@ -381,13 +384,14 @@ real_kernel_convolution_kernel(
                     }
 
                     g_hat_idx = M*g_hat_idx + (f % M);
+                    f /= M;
                 }
 
                 if (coeff_idx < 0) {
                     g_hat[g_hat_idx] = make_cuFloatComplex(0.0f, 0.0f);
                 }
                 else {
-                    factor *= coeffs_acc[coeff_idx];
+                    factor *= factor * coeffs_acc[coeff_idx];
                     g_hat[g_hat_idx] = make_cuFloatComplex(
                         factor * cuCrealf(g_hat[g_hat_idx]),
                         factor * cuCimagf(g_hat[g_hat_idx]));
