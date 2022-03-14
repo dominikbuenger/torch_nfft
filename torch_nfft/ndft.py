@@ -42,3 +42,21 @@ def ndft_forward(x, pos, batch=None):
     else:
         batch_size = batch.max().item() + 1
         return torch.cat([single_ndft(x[idx], pos[batch == idx]) for idx in range(batch_size)])
+
+
+
+def ndft_fastsum(x, coeffs, sources, targets=None, source_batch=None, target_batch=None, batch=None, N=16):
+    if targets is None:
+        targets = sources
+        target_batch = source_batch
+    if batch is not None:
+        source_batch = batch
+        target_batch = batch
+
+    y = ndft_adjoint(x, sources, source_batch, N=N)
+
+    y *= coeffs[None,...,None]
+
+    y = ndft_forward(y, targets, target_batch)
+
+    return y if x.is_complex() else y.real
