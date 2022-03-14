@@ -3,47 +3,44 @@
 import torch
 import math
 
-from torch_nfft import nfft_fastsum
+from torch_nfft import nfft_fastsum, ndft_fastsum
 
 
 n = 5
 dim = 2
 c = 1
-
-N = 16
+sigma = 0.5
+N = 32
 m = 3
 
 
 pos = torch.rand((n, dim)).cuda() - 0.5
-pos /= torch.linalg.norm(pos, dim=1, keepdim=True)
-x = torch.rand((n, c)).cuda()
-
-sigma = 0.5
+pos /= 4*torch.linalg.norm(pos, dim=1, keepdim=True)
 
 
-coeffs1d = (0.5 * sigma / math.sqrt(math.pi)) * torch.exp(-0.25 * sigma**2 * torch.arange(-N//2, -N//2 + N) ** 2).cuda()
-
+coeffs1d = sigma * math.sqrt(math.pi) * torch.exp(-(math.pi * sigma * torch.arange(-N//2, -N//2 + N).cuda()) ** 2)
 coeffs = torch.ones(*((N,)*dim)).cuda()
 for d in range(dim):
     coeffs *= coeffs1d.view(N, *((1,)*d))
 
 
-
-print("Coeffs slice:")
-print(coeffs[0])
-print(coeffs[N//2])
-print()
-
-
 A_nfft = nfft_fastsum(torch.eye(n).cuda(), coeffs, pos, N=N, m=m)
-
-y_nfft = nfft_fastsum(x, coeffs, pos, N=N, m=m)
-
 
 print("Approximate A:")
 print(A_nfft)
-print("Approximate result:")
-print(y_nfft)
+print()
+
+
+grid1d = torch.arange(-N//2, N//2, dtype=torch.float).cuda()
+grid = torch.cat([g[...,None] for g in torch.meshgrid(*((grid1d,)*dim), indexing='ij')], dim=dim)
+tmp = pos.reshape(1,n,dim) - pos.reshape(n,1,dim)
+tmp = torch.tensordot(grid, tmp, dims=([-1],[-1]))
+tmp = torch.exp(2j * torch.pi * tmp)
+tmp = torch.tensordot(coeffs.to(torch.cfloat), tmp, dims=dim)
+A_trigon = tmp.real
+
+print("Trigonometric A:")
+print(A_trigon)
 print()
 
 
@@ -52,6 +49,3 @@ y_true = A_true @ x
 
 print("True A:")
 print(A_true)
-print("True result:")
-print(y_true)
-print()
