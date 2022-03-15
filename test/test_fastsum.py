@@ -9,7 +9,7 @@ import torch_nfft
 n = 200
 dim = 2
 c = 1
-sigma = 0.1
+sigma = 0.2
 N = 8
 m = 3
 

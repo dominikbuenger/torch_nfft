@@ -587,6 +587,7 @@ nfft_fastsum_cuda(
         M_array, &prod_N, &prod_M, &window_volume);
 
     CHECK_CUDA(coeffs);
+    CHECK_INPUT(coeffs.dim() == dim);
     CHECK_INPUT(coeffs.numel() == prod_N);
     int real_coeffs = (coeffs.scalar_type() == at::ScalarType::Float);
     if (!real_coeffs)
