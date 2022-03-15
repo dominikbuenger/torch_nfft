@@ -60,3 +60,25 @@ def ndft_fastsum(x, coeffs, sources, targets=None, source_batch=None, target_bat
     y = ndft_forward(y, targets, target_batch)
 
     return y if x.is_complex() else y.real
+
+
+def exact_gaussian_matrix(sigma, sources, targets=None, source_batch=None, target_batch=None, batch=None):
+    if targets is None:
+        targets = sources
+        target_batch = source_batch
+    if batch is not None:
+        source_batch = batch
+        target_batch = batch
+
+    def single_gaussian_matrix(source_part, target_part):
+        source_sq_norms = torch.sum(source_part**2, dim=1, keepdim=True)
+        target_sq_norms = torch.sum(target_part**2, dim=1, keepdim=True)
+        return torch.exp(-(target_sq_norms - 2*target_part @ source_part.T + source_sq_norms.T) / (sigma**2))
+
+    if source_batch is None:
+        return single_gaussian_matrix(sources, targets)
+
+    batch_size = source_batch.max().item() + 1
+    blocks = [single_gaussian_matrix(sources[source_batch == b], targets[target_batch == b])
+                for b in range(batch_size)]
+    return torch.block_diag(*blocks)
