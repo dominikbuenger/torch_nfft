@@ -879,6 +879,67 @@ gaussian_analytical_coeffs_cuda(
 
 
 torch::Tensor
+gaussian_interpolated_coeffs_cuda(
+    const double sigma,
+    const int64_t N,
+    const int64_t dim,
+    const int64_t p,
+    const double eps)
+{
+    AT_ASSERTM(p <= 0, "Gaussian interpolated coeffs are currently only implemented for p<=0");
+    AT_ASSERTM(eps == 0.0, "Gaussian interpolated coeffs are currently only implemented for eps=0");
+
+    int N_array[3] = {(int)N,(int)N,(int)N};
+    int64_t prod_N = N;
+    for (int d=1; d<dim; ++d)
+        prod_N *= N;
+
+    cufftComplex *b;
+    cudaMalloc(&b, prod_N*sizeof(cufftComplex));
+
+    dim3 gridDim, blockDim;
+    setupGrid(&gridDim, &blockDim, prod_N);
+
+    fill_gaussian_regularized_values_kernel<<<gridDim, blockDim>>>(
+        b, (float)(sigma*sigma), dim, N, prod_N, p, (float)eps);
+    CHECK_ERRORS();
+
+    cufftHandle plan;
+    AT_ASSERTM(cufftPlanMany(&plan, dim,
+                N_array,                        // shape of the transform (n)
+                N_array,                        // shape of the real input data (inembed)
+                1,                              // stride of the real input data (istride)
+                prod_N,                         // distance between consecutive input batch signals (idist)
+                N_array,                        // shape of the complex output data (onembed)
+                1,                              // stride of the complex output data (ostride)
+                prod_N,                         // distance between consecutive output batch signals (odist)
+                CUFFT_C2C,                      // transform type
+                1)                              // total number of signals
+            == CUFFT_SUCCESS, "Failed to create CUFFT plan");
+
+    AT_ASSERTM(cufftExecC2C(plan, b, b, CUFFT_FORWARD)
+            == CUFFT_SUCCESS, "Failed to execute CUFFT plan");
+
+    CHECK_ERRORS();
+    cufftDestroy(plan);
+
+    std::vector<int64_t> coeffs_sizes = std::vector<int64_t>(dim, N);
+    torch::Tensor coeffs = torch::zeros(coeffs_sizes,
+        torch::TensorOptions().dtype(at::ScalarType::ComplexFloat).device(torch::kCUDA));
+    torch::Tensor coeffs_reshaped = coeffs.view(prod_N);
+
+    copy_interpolated_kernel_coeffs_kernel<<<gridDim, blockDim>>>(
+        coeffs_reshaped.packed_accessor64<c10::complex<float>, 1>(),
+        b,
+        dim, N, prod_N);
+    CHECK_ERRORS();
+
+    cudaFree(b);
+    return coeffs;
+}
+
+
+torch::Tensor
 interpolation_grid_cuda(
     const int64_t N,
     const int64_t dim)

@@ -30,6 +30,48 @@ fill_gaussian_analytical_coeffs_kernel(
 }
 
 
+__global__ void
+fill_gaussian_regularized_values_kernel(
+    cufftComplex *b,
+    const float sigma2,
+    const int dim,
+    const int64_t N,
+    const int64_t prod_N,
+    const int64_t p,
+    const float eps)
+{
+    int64_t idx, b_idx, i;
+    int d;
+    float r2, value;
+
+    for (idx = blockIdx.x*blockDim.x + threadIdx.x; idx < prod_N; idx += gridDim.x*blockDim.x)
+    {
+        // idx has the form ((i[0]*N + i[1])*N + ...)*N + i[dim-1]
+        // where i goes from 0 to N-1, which is shifted from l in [-N/2,...,N/2-1]
+        i = idx;
+        b_idx = 0;
+        r2 = 0.0f;
+        for (d=0; d<dim; ++d) {
+            // i % N == i[dim-d-1] == l[dim-d-1] + N/2
+            r2 += (((i % N) / (float)N) - 0.5f) * (((i % N) / (float)N) - 0.5f);
+            b_idx = N*b_idx + ((i + N/2) % N);
+            i /= N;
+        }
+
+        if (p < 0 || r2 <= (0.5f - eps)*(0.5f - eps)) {
+            value = expf(-r2 / sigma2);
+        }
+        else if (r2 >= 0.25f) {
+            value = expf(-0.25 / sigma2);
+        }
+        else {
+            // regularized part: not implemented yet
+        }
+
+        b[b_idx] = make_cuFloatComplex(value, 0.0f);
+    }
+}
+
 
 __global__ void
 fill_interpolation_grid_kernel(

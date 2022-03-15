@@ -9,8 +9,8 @@ import torch_nfft
 n = 200
 dim = 2
 c = 1
-sigma = 1
-N = 16
+sigma = 0.1
+N = 8
 m = 3
 
 
@@ -52,10 +52,7 @@ print()
 
 
 
-grid = torch_nfft.radial_interpolation_grid(dim=dim, N=N)
-grid_values = torch.exp(-(grid / sigma)**2)
-coeffs = torch_nfft.interpolated_kernel_coeffs(grid_values)
-
+coeffs = torch_nfft.gaussian_interpolated_coeffs(sigma, dim=dim, N=N, p=0)
 
 
 A_nfft = torch_nfft.nfft_fastsum(torch.eye(n).cuda(), coeffs, pos, N=N, m=m)

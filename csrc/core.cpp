@@ -132,6 +132,17 @@ gaussian_analytical_coeffs(
 }
 
 
+torch::Tensor
+gaussian_interpolated_coeffs(
+    const double sigma,
+    const int64_t N,
+    const int64_t dim,
+    const int64_t p,
+    const double eps)
+{
+    return gaussian_interpolated_coeffs_cuda(sigma, N, dim, p, eps);
+}
+
 
 torch::Tensor
 interpolation_grid(
@@ -168,6 +179,7 @@ static auto registry = torch::RegisterOperators()
     .op("torch_nfft::nfft_forward", &nfft_forward)
     .op("torch_nfft::nfft_fastsum", &nfft_fastsum)
     .op("torch_nfft::gaussian_analytical_coeffs", &gaussian_analytical_coeffs)
+    .op("torch_nfft::gaussian_interpolated_coeffs", &gaussian_interpolated_coeffs)
     .op("torch_nfft::interpolation_grid", &interpolation_grid)
     .op("torch_nfft::radial_interpolation_grid", &radial_interpolation_grid)
     .op("torch_nfft::interpolated_kernel_coeffs", &interpolated_kernel_coeffs);
