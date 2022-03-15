@@ -39,3 +39,20 @@ gaussian_analytical_coeffs_cuda(
     const double sigma,
     const int64_t N,
     const int64_t dim);
+
+
+torch::Tensor
+interpolation_grid_cuda(
+    const int64_t N,
+    const int64_t dim);
+
+
+torch::Tensor
+radial_interpolation_grid_cuda(
+    const int64_t N,
+    const int64_t dim);
+
+
+torch::Tensor
+interpolated_kernel_coeffs_cuda(
+    const torch::Tensor grid_values);

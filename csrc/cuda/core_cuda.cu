@@ -872,6 +872,131 @@ gaussian_analytical_coeffs_cuda(
     fill_gaussian_analytical_coeffs_kernel<<<gridDim, blockDim>>>(
         coeffs_reshaped.packed_accessor64<float,1>(),
         (float)sigma, dim, N, prod_N);
+    CHECK_ERRORS();
 
+    return coeffs;
+}
+
+
+torch::Tensor
+interpolation_grid_cuda(
+    const int64_t N,
+    const int64_t dim)
+{
+    int64_t prod_N = N;
+    for (int d=1; d<dim; ++d)
+        prod_N *= N;
+
+    std::vector<int64_t> grid_sizes = std::vector<int64_t>(dim+1, N);
+    grid_sizes[dim] = dim;
+    torch::Tensor grid = torch::zeros(grid_sizes,
+        torch::TensorOptions().dtype(torch::kFloat32).device(torch::kCUDA));
+    torch::Tensor grid_reshaped = grid.view({prod_N, dim});
+
+    dim3 gridDim, blockDim;
+    setupGrid(&gridDim, &blockDim, prod_N);
+
+    fill_interpolation_grid_kernel<<<gridDim, blockDim>>>(
+        grid_reshaped.packed_accessor64<float,2>(),
+        dim, N, prod_N);
+    CHECK_ERRORS();
+
+    return grid;
+}
+
+torch::Tensor
+radial_interpolation_grid_cuda(
+    const int64_t N,
+    const int64_t dim)
+{
+    int64_t prod_N = N;
+    for (int d=1; d<dim; ++d)
+        prod_N *= N;
+
+    std::vector<int64_t> grid_sizes = std::vector<int64_t>(dim, N);
+    torch::Tensor grid = torch::zeros(grid_sizes,
+        torch::TensorOptions().dtype(torch::kFloat32).device(torch::kCUDA));
+    torch::Tensor grid_reshaped = grid.view({prod_N});
+
+    dim3 gridDim, blockDim;
+    setupGrid(&gridDim, &blockDim, prod_N);
+
+    fill_radial_interpolation_grid_kernel<<<gridDim, blockDim>>>(
+        grid_reshaped.packed_accessor64<float,1>(),
+        dim, N, prod_N);
+    CHECK_ERRORS();
+
+    return grid;
+}
+
+
+torch::Tensor
+interpolated_kernel_coeffs_cuda(
+    const torch::Tensor grid_values)
+{
+    CHECK_CUDA(grid_values);
+    int dim = grid_values.dim();
+    CHECK_INPUT(dim >= 1 && dim <= 3);
+    int N = grid_values.size(0);
+
+    int N_array[3] = {N,N,N};
+    int64_t prod_N = N;
+    for (int d=0; d<dim; ++d) {
+        CHECK_INPUT(grid_values.size(d) == dim);
+        prod_N *= N;
+    }
+
+    cufftComplex *b;
+    cudaMalloc(&b, prod_N*sizeof(cufftComplex));
+
+    dim3 gridDim, blockDim;
+    setupGrid(&gridDim, &blockDim, prod_N);
+
+    const torch::Tensor grid_values_reshaped = grid_values.view(prod_N);
+
+    if (grid_values.scalar_type() == at::ScalarType::Float) {
+        copy_real_grid_kernel_values_kernel<<<gridDim, blockDim>>>(
+            grid_values_reshaped.packed_accessor64<float,1>(),
+            b, dim, N, prod_N);
+    }
+    else {
+        CHECK_INPUT(grid_values.scalar_type() == at::ScalarType::ComplexFloat);
+        copy_complex_grid_kernel_values_kernel<<<gridDim, blockDim>>>(
+            grid_values_reshaped.packed_accessor64<c10::complex<float>,1>(),
+            b, dim, N, prod_N);
+    }
+    CHECK_ERRORS();
+
+
+    cufftHandle plan;
+    AT_ASSERTM(cufftPlanMany(&plan, dim,
+                N_array,                        // shape of the transform (n)
+                N_array,                        // shape of the real input data (inembed)
+                1,                              // stride of the real input data (istride)
+                prod_N,                         // distance between consecutive input batch signals (idist)
+                N_array,                        // shape of the complex output data (onembed)
+                1,                              // stride of the complex output data (ostride)
+                prod_N,                         // distance between consecutive output batch signals (odist)
+                CUFFT_C2C,                      // transform type
+                1)                              // total number of signals
+            == CUFFT_SUCCESS, "Failed to create CUFFT plan");
+
+    AT_ASSERTM(cufftExecC2C(plan, b, b, CUFFT_FORWARD)
+            == CUFFT_SUCCESS, "Failed to execute CUFFT plan");
+
+    CHECK_ERRORS();
+    cufftDestroy(plan);
+
+    torch::Tensor coeffs = torch::zeros(grid_values.sizes(),
+                                        grid_values.options().dtype(at::ScalarType::ComplexFloat));
+    torch::Tensor coeffs_reshaped = coeffs.view(prod_N);
+
+    copy_interpolated_kernel_coeffs_kernel<<<gridDim, blockDim>>>(
+        coeffs_reshaped.packed_accessor64<c10::complex<float>, 1>(),
+        b,
+        dim, N, prod_N);
+    CHECK_ERRORS();
+
+    cudaFree(b);
     return coeffs;
 }
