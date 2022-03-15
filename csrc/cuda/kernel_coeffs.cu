@@ -104,7 +104,7 @@ copy_complex_grid_kernel_values_kernel(
             i /= N;
         }
         value = grid_values_acc[idx];
-        b[idx] = make_cuFloatComplex(value.real(), value.imag());
+        b[b_idx] = make_cuFloatComplex(value.real(), value.imag());
     }
 }
 
@@ -129,7 +129,7 @@ copy_real_grid_kernel_values_kernel(
             b_idx = N*b_idx + ((i + N/2) % N);
             i /= N;
         }
-        b[idx] = make_cuFloatComplex(grid_values_acc[idx], 0.0f);
+        b[b_idx] = make_cuFloatComplex(grid_values_acc[idx], 0.0f);
     }
 }
 
@@ -155,6 +155,6 @@ copy_interpolated_kernel_coeffs_kernel(
             b_idx = N*b_idx + ((i + N/2) % N);
             i /= N;
         }
-        coeffs_acc[idx] = c10::complex<float>(cuCrealf(b[b_idx]), cuCimagf(b[b_idx]));
+        coeffs_acc[idx] = c10::complex<float>(cuCrealf(b[b_idx]) / prod_N, cuCimagf(b[b_idx]) / prod_N);
     }
 }

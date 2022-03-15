@@ -941,8 +941,8 @@ interpolated_kernel_coeffs_cuda(
 
     int N_array[3] = {N,N,N};
     int64_t prod_N = N;
-    for (int d=0; d<dim; ++d) {
-        CHECK_INPUT(grid_values.size(d) == dim);
+    for (int d=1; d<dim; ++d) {
+        CHECK_INPUT(grid_values.size(d) == N);
         prod_N *= N;
     }
 
