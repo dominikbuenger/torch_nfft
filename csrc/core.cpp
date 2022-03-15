@@ -113,12 +113,11 @@ nfft_fastsum(
     const torch::Tensor coeffs,
     const torch::optional<torch::Tensor> opt_source_batch,
     const torch::optional<torch::Tensor> opt_target_batch,
-    const int64_t N,
     const int64_t m)
 {
     AT_ASSERTM(x.device().is_cuda(), "torch_nfft.nfft_fastsum is currently only implemented for GPU tensors");
 
-    return nfft_fastsum_cuda(sources, targets, x, coeffs, opt_source_batch, opt_target_batch, N, m);
+    return nfft_fastsum_cuda(sources, targets, x, coeffs, opt_source_batch, opt_target_batch, m);
 }
 
 

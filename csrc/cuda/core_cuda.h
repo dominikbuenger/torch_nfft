@@ -30,7 +30,6 @@ nfft_fastsum_cuda(
     const torch::Tensor coeffs,
     const torch::optional<torch::Tensor> opt_source_batch,
     const torch::optional<torch::Tensor> opt_target_batch,
-    const int64_t N,
     const int64_t m);
 
 

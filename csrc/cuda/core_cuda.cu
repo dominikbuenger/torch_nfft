@@ -540,7 +540,6 @@ nfft_fastsum_cuda(
     const torch::Tensor coeffs,
     const torch::optional<torch::Tensor> opt_source_batch,
     const torch::optional<torch::Tensor> opt_target_batch,
-    const int64_t N,
     const int64_t m)
 {
     int dim;
@@ -575,9 +574,14 @@ nfft_fastsum_cuda(
     check_spatial_coeffs_input(x, num_sources_total,
         &real_input, &num_columns);
 
-    cudaSetDevice(x.get_device());
-    auto stream = at::cuda::getCurrentCUDAStream();
-    dim3 gridDim, blockDim;
+    CHECK_CUDA(coeffs);
+    CHECK_INPUT(coeffs.dim() == dim);
+    int N = coeffs.size(0);
+    for (int d=1; d<dim; ++d)
+        CHECK_INPUT(coeffs.size(d) == N);
+    int real_coeffs = (coeffs.scalar_type() == at::ScalarType::Float);
+    if (!real_coeffs)
+        CHECK_INPUT(coeffs.scalar_type() == at::ScalarType::ComplexFloat);
 
     int M_array[3];
     int64_t prod_N;
@@ -586,13 +590,9 @@ nfft_fastsum_cuda(
     setup_spectral_dimensions(N, m, dim,
         M_array, &prod_N, &prod_M, &window_volume);
 
-    CHECK_CUDA(coeffs);
-    CHECK_INPUT(coeffs.dim() == dim);
-    CHECK_INPUT(coeffs.numel() == prod_N);
-    int real_coeffs = (coeffs.scalar_type() == at::ScalarType::Float);
-    if (!real_coeffs)
-        CHECK_INPUT(coeffs.scalar_type() == at::ScalarType::ComplexFloat);
-
+    cudaSetDevice(x.get_device());
+    auto stream = at::cuda::getCurrentCUDAStream();
+    dim3 gridDim, blockDim;
 
 #ifdef NFFT_PRINT_DEBUG
     printf("Point dimension: %d\n", dim);

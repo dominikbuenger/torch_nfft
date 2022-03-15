@@ -31,7 +31,7 @@ class NfftFastsumFunction(torch.autograd.Function):
         assert target_batch is None or not target_batch.requires_grad, \
             "NfftFastsum: Gradient computation w.r.t. batches is not possible"
 
-        y = _nfft_fastsum(sources, targets, x, coeffs, source_batch, target_batch, coeffs.size(0), cutoff_param)
+        y = _nfft_fastsum(sources, targets, x, coeffs, source_batch, target_batch, cutoff_param)
 
         ctx.save_for_backward(sources, targets, coeffs, source_batch, target_batch)
         ctx.m = cutoff_param
@@ -42,7 +42,7 @@ class NfftFastsumFunction(torch.autograd.Function):
     def backward(ctx, dy):
         sources, targets, coeffs, source_batch, target_batch = ctx.saved_variables
 
-        dx = _nfft_fastsum(targets, sources, dy, coeffs, target_batch, source_batch, coeffs.size(0), ctx.m)
+        dx = _nfft_fastsum(targets, sources, dy, coeffs, target_batch, source_batch, ctx.m)
 
         return dx, None, None, None, None, None, None
 
