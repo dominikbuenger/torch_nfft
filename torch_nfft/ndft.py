@@ -62,6 +62,39 @@ def ndft_fastsum(x, coeffs, sources, targets=None, source_batch=None, target_bat
     return y if x.is_complex() else y.real
 
 
+
+def exact_trigonometric_matrix(coeffs, sources, targets=None, source_batch=None, target_batch=None, /, batch=None):
+    if targets is None:
+        targets = sources
+        target_batch = source_batch
+    if batch is not None:
+        source_batch = batch
+        target_batch = batch
+
+    dim = coeffs.dim()
+    N = coeffs.size(0)
+    coeffs = coeffs.to(torch.cfloat)
+
+    grid1d = torch.arange(-N/2, N/2, dtype=torch.float, device=coeffs.device)
+    grid = torch.cat([g[...,None] for g in torch.meshgrid(*((grid1d,)*dim), indexing='ij')], dim=dim)
+
+
+    def single_trigonometric_matrix(source_part, target_part):
+        mat = source_part.reshape((1, -1, dim)) - target_part.reshape((-1, 1, dim))
+        mat = torch.tensordot(grid, mat, dims=([-1],[-1]))
+        mat = torch.exp(2j*torch.pi*mat)
+        mat = torch.tensordot(coeffs, mat, dims=dim)
+        return mat
+
+    if source_batch is None:
+        return single_trigonometric_matrix(sources, targets)
+
+    batch_size = source_batch.max().item() + 1
+    blocks = [single_trigonometric_matrix(sources[source_batch == b], targets[target_batch == b])
+                for b in range(batch_size)]
+    return torch.block_diag(*blocks)
+
+
 def exact_gaussian_matrix(sigma, sources, targets=None, source_batch=None, target_batch=None, batch=None):
     if targets is None:
         targets = sources

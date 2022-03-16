@@ -37,12 +37,8 @@ print("Maximum absolute entry error: ", torch.abs(A_nfft - A_true).max().item())
 print()
 
 
-grid = N * torch_nfft.interpolation_grid(dim=dim, N=N)
-tmp = pos.reshape(1,n,dim) - pos.reshape(n,1,dim)
-tmp = torch.tensordot(grid, tmp, dims=([-1],[-1]))
-tmp = torch.exp(2j * torch.pi * tmp)
-tmp = torch.tensordot(coeffs.to(torch.cfloat), tmp, dims=dim)
-A_trigon = tmp.real
+
+A_trigon = torch_nfft.exact_trigonometric_matrix(coeffs, pos).real
 
 print("Trigonometric A with analytic coeffs:")
 if n < 10:
@@ -64,12 +60,7 @@ print("Maximum absolute entry error: ", torch.abs(A_nfft - A_true).max().item())
 print()
 
 
-grid = N * torch_nfft.interpolation_grid(dim=dim, N=N)
-tmp = pos.reshape(1,n,dim) - pos.reshape(n,1,dim)
-tmp = torch.tensordot(grid, tmp, dims=([-1],[-1]))
-tmp = torch.exp(2j * torch.pi * tmp)
-tmp = torch.tensordot(coeffs.to(torch.cfloat), tmp, dims=dim)
-A_trigon = tmp.real
+A_trigon = torch_nfft.exact_trigonometric_matrix(coeffs, pos).real
 
 print("Trigonometric A with interpolated coeffs:")
 if n < 10:
