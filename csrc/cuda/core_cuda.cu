@@ -853,7 +853,7 @@ nfft_fastsum_cuda(
 
 
 torch::Tensor
-gaussian_analytical_coeffs_cuda(
+gaussian_analytic_coeffs_cuda(
     const double sigma,
     const int64_t N,
     const int64_t dim)
@@ -870,7 +870,7 @@ gaussian_analytical_coeffs_cuda(
     dim3 gridDim, blockDim;
     setupGrid(&gridDim, &blockDim, prod_N);
 
-    fill_gaussian_analytical_coeffs_kernel<<<gridDim, blockDim>>>(
+    fill_gaussian_analytic_coeffs_kernel<<<gridDim, blockDim>>>(
         coeffs_reshaped.packed_accessor64<float,1>(),
         (float)sigma, dim, N, prod_N);
     CHECK_ERRORS();

@@ -26,11 +26,11 @@ if n < 10:
 
 
 
-coeffs = torch_nfft.gaussian_analytical_coeffs(sigma, dim=dim, N=N)
+coeffs = torch_nfft.gaussian_analytic_coeffs(sigma, dim=dim, N=N)
 
-A_nfft = torch_nfft.nfft_fastsum(torch.eye(n).cuda(), coeffs, pos, N=N, m=m)
+A_nfft = torch_nfft.nfft_fastsum(torch.eye(n).cuda(), coeffs, pos, cutoff=m)
 
-print("Approximate A with analytical coeffs:")
+print("Approximate A with analytic coeffs:")
 if n < 10:
     print(A_nfft)
 print("Maximum absolute entry error: ", torch.abs(A_nfft - A_true).max().item())
@@ -44,7 +44,7 @@ tmp = torch.exp(2j * torch.pi * tmp)
 tmp = torch.tensordot(coeffs.to(torch.cfloat), tmp, dims=dim)
 A_trigon = tmp.real
 
-print("Trigonometric A with analytical coeffs:")
+print("Trigonometric A with analytic coeffs:")
 if n < 10:
     print(A_trigon)
 print("Maximum absolute entry error: ", torch.abs(A_trigon - A_true).max().item())
@@ -55,7 +55,7 @@ print()
 coeffs = torch_nfft.gaussian_interpolated_coeffs(sigma, dim=dim, N=N, p=0)
 
 
-A_nfft = torch_nfft.nfft_fastsum(torch.eye(n).cuda(), coeffs, pos, N=N, m=m)
+A_nfft = torch_nfft.nfft_fastsum(torch.eye(n).cuda(), coeffs, pos, cutoff=m)
 
 print("Approximate A with interpolated coeffs:")
 if n < 10:

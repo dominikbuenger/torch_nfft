@@ -4,7 +4,7 @@
 
 
 __global__ void
-fill_gaussian_analytical_coeffs_kernel(
+fill_gaussian_analytic_coeffs_kernel(
     torch::PackedTensorAccessor64<float,1> coeffs_acc,
     const float sigma,
     const int dim,

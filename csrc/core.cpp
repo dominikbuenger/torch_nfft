@@ -122,12 +122,12 @@ nfft_fastsum(
 
 
 torch::Tensor
-gaussian_analytical_coeffs(
+gaussian_analytic_coeffs(
     const double sigma,
     const int64_t N,
     const int64_t dim)
 {
-    return gaussian_analytical_coeffs_cuda(sigma, N, dim);
+    return gaussian_analytic_coeffs_cuda(sigma, N, dim);
 }
 
 
@@ -177,7 +177,7 @@ static auto registry = torch::RegisterOperators()
     .op("torch_nfft::nfft_adjoint", &nfft_adjoint)
     .op("torch_nfft::nfft_forward", &nfft_forward)
     .op("torch_nfft::nfft_fastsum", &nfft_fastsum)
-    .op("torch_nfft::gaussian_analytical_coeffs", &gaussian_analytical_coeffs)
+    .op("torch_nfft::gaussian_analytic_coeffs", &gaussian_analytic_coeffs)
     .op("torch_nfft::gaussian_interpolated_coeffs", &gaussian_interpolated_coeffs)
     .op("torch_nfft::interpolation_grid", &interpolation_grid)
     .op("torch_nfft::radial_interpolation_grid", &radial_interpolation_grid)

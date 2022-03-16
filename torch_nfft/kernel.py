@@ -2,7 +2,7 @@
 import torch
 
 from .nfft import nfft_fastsum
-from .coeffs import gaussian_analytical_coeffs, gaussian_interpolated_coeffs
+from .coeffs import gaussian_analytic_coeffs, gaussian_interpolated_coeffs
 
 class GramMatrix:
     def __init__(self, coeffs, sources, targets=None, source_batch=None, target_batch=None, /, batch=None, cutoff=3):
@@ -59,7 +59,7 @@ class GramMatrix:
 class GaussianKernel:
     def __init__(self, sigma, dim=3, bandwidth=16, cutoff=3,
                 shift_to_center=False, uniform_radius=None,
-                analytical=False, reg_degree=-1, reg_width=0.0):
+                analytic=False, reg_degree=-1, reg_width=0.0):
 
         self.cutoff = cutoff
         self.shift_to_center = shift_to_center
@@ -69,8 +69,8 @@ class GaussianKernel:
         if uniform_radius is not None:
             self.factor /= uniform_radius
 
-        if analytical:
-            self.coeffs = gaussian_analytical_coeffs(self.factor * sigma, dim, bandwidth)
+        if analytic:
+            self.coeffs = gaussian_analytic_coeffs(self.factor * sigma, dim, bandwidth)
         else:
             self.coeffs = gaussian_interpolated_coeffs(self.factor * sigma, dim, bandwidth, reg_degree, reg_width)
 
