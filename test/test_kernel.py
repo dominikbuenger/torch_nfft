@@ -6,7 +6,7 @@ import torch_nfft
 
 n = 4
 dim = 2
-b = 2
+b = 1
 c = 3
 diameter = 10
 sigma = 0.2 * diameter
@@ -20,7 +20,7 @@ batch = None if b <= 1 else torch.div(torch.arange(n*b).cuda(), n, rounding_mode
 x = torch.rand((n*b, c)).cuda()
 
 
-kernel = torch_nfft.GaussianKernel(sigma, dim, N, m, shift_to_center=True, uniform_radius=diameter/2)
+kernel = torch_nfft.GaussianKernel(sigma, dim, N, m, shift_by_center=True, max_infinity_norm=diameter/2)
 
 y_approx = kernel(pos, batch=batch) @ torch.eye(n*b).cuda()
 
