@@ -19,7 +19,9 @@ core_extension = CUDAExtension('torch_nfft.core',
                                extra_link_args=['-s'])
 
 setup(
-    name='torch_nfft',
+    name='torch-nfft',
+    version='0.1.0',
+    description='NFFT and fast kernel matrix approximation in PyTorch',
     packages=['torch_nfft'],
     py_modules = [],
     ext_modules=[core_extension],
