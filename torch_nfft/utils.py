@@ -23,11 +23,11 @@ def shift_points_by_center(sources, targets=None, source_batch=None, target_batc
         except ImportError as e:
             raise RuntimeError("Shifting a batch of points by their centers requires torch_scatter") from e
 
-        min_coords = scatter_min(sources, source_batch, dim=0)
-        max_coords = scatter_max(sources, source_batch, dim=1)
+        min_coords = scatter_min(sources, source_batch, dim=0)[0]
+        max_coords = scatter_max(sources, source_batch, dim=0)[0]
         if targets is not None:
-            min_coords = torch.minimum(min_coords, scatter_min(targets, target_batch, dim=0))
-            max_coords = torch.maximum(max_coords, scatter_max(targets, target_batch, dim=0))
+            min_coords = torch.minimum(min_coords, scatter_min(targets, target_batch, dim=0)[0])
+            max_coords = torch.maximum(max_coords, scatter_max(targets, target_batch, dim=0)[0])
 
         centers = 0.5 * (min_coords + max_coords)
         sources = sources - centers[source_batch]
@@ -60,9 +60,9 @@ def scale_points_by_norm(sources, targets=None, source_batch=None, target_batch=
             raise RuntimeError("Scaling a batch of points by their norms requires torch_scatter") from e
 
         if norm == "euclidean":
-            norm = lambda points, batch: scatter_max(torch.sum(points ** 2, dim=1), batch).sqrt()
+            norm = lambda points, batch: scatter_max(torch.sum(points ** 2, dim=1), batch)[0].sqrt()
         elif norm == "infinity":
-            norm = lambda points, batch: scatter_max(points.abs().max(dim=1).values, batch)
+            norm = lambda points, batch: scatter_max(points.abs().max(dim=1).values, batch)[0]
         else:
             raise ValueError(f"scale_points_by_norm received unknown norm: {norm}")
 
