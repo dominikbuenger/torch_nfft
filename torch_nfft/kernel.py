@@ -84,7 +84,7 @@ class GaussianKernel:
         else:
             radius = max_euclidean_norm
             if radius is None and max_infinity_norm is not None:
-                radius = max_infinity_norm / math.sqrt(dim)
+                radius = max_infinity_norm * math.sqrt(dim)
             if radius is None:
                 self.scale_by_norm = "euclidean"
             else:
