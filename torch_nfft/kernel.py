@@ -52,12 +52,74 @@ class GramMatrix:
         return self.T.row_sums()
 
 
-# If uniform_radius is given, then all points are assumed to have norm of at
-# most uniform_radius and the GramMatrix approximates
-#    A[j, i] = K(dist(sources[i], targets[j]))
-# Otherwise, the maximum radius of each input point set is computed independently
-# and the GramMatrix approximates
-#    A[j, i] = K(dist(sources[i], targets[j]) / radius)
+
+class AdjacencyMatrix:
+
+    def __init__(self, gram_matrix, diagonal_offset=0, normalization=None):
+
+        if not gram_matrix.is_symmetric():
+            raise ValueError("The underlying Gram matrix of an AdjacencyMatrix must be symmetric")
+
+        self.gram_matrix = gram_matrix
+        self.diagonal_offset = diagonal_offset
+        self.normalization = normalization
+
+        if normalization is not None and normalization != "none":
+            degrees = gram_matrix.row_sums()
+            if diagonal_offset != 0:
+                degrees += diagonal_offset
+
+            # normalization == "rw" is a synonym for "left"
+            if normalization == "rw":
+                normalization = "left"
+
+            if normalization == "sym":
+                self.d_inv_sqrt = torch.rsqrt(degrees)
+            elif normalization == "left" or normalization == "right":
+                self.d_inv = 1 / degrees
+            else:
+                raise ValueError(f"Unknown AdjacencyMatrix normalization type: {normalization}")
+
+    def apply_left_normalization(self, x):
+        if self.normalization == "sym":
+            return self.d_inv_sqrt[(...,) + (None,)*(x.dim()-1)] * x
+        elif self.normalization == "left":
+            return self.d_inv[(...,) + (None,)*(x.dim()-1)] * x
+        return x
+
+    def apply_right_normalization(self, x):
+        if self.normalization == "sym":
+            return self.d_inv_sqrt[(...,) + (None,)*(x.dim()-1)] * x
+        elif self.normalization == "right":
+            return self.d_inv[(...,) + (None,)*(x.dim()-1)] * x
+        return x
+
+    def apply(self, x):
+        x = self.apply_right_normalization(x)
+        y = self.gram_matrix @ x
+        if self.diagonal_offset != 0:
+            y += self.diagonal_offset * x
+        return self.apply_left_normalization(y)
+
+    def __matmul__(self, x):
+        return self.apply(x)
+
+    def is_symmetric(self):
+        return self.normalization != "left" and self.normalization != "right"
+
+    def transpose(self):
+        if self.normalization == "left" or self.normalization == "right":
+            transposed = AdjacencyMatrix(self.gram_matrix, self.diagonal_offset, normalization=None)
+            transposed.normalization = "right" if self.normalization == "left" else "left"
+            transposed.d_inv = self.d_inv
+            return transposed
+        return self
+
+    @property
+    def T(self):
+        return self.transpose()
+
+
 class GaussianKernel:
     r"""
         An approximation of a Gaussian kernel function that allows fast multiplication
@@ -169,3 +231,9 @@ class GaussianKernel:
 
     def __call__(self, *args, **kwargs):
         return self.gram_matrix(*args, **kwargs)
+
+
+    def adjacency_matrix(self, sources, batch=None, loop_weight=1, normalization=None):
+        return AdjacencyMatrix(self.gram_matrix(sources, batch=batch),
+                                diagonal_offset=loop_weight-1,
+                                normalization=normalization)
