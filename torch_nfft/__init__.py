@@ -16,4 +16,5 @@ from .ndft import ndft_forward, ndft_adjoint, ndft_fastsum, \
     exact_trigonometric_matrix, exact_gaussian_matrix
 from .coeffs import gaussian_analytic_coeffs, gaussian_interpolated_coeffs, \
     interpolation_grid, radial_interpolation_grid, interpolated_kernel_coeffs
-from .kernel import GramMatrix, GaussianKernel
+from .matrices import GramMatrix, AdjacencyMatrix
+from .kernel import GaussianKernel
