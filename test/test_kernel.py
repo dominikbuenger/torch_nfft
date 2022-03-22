@@ -45,8 +45,8 @@ y_approx = kernel(pos, batch=batch) @ torch.eye(n*b).cuda()
 
 pos_shifted_scaled = torch_nfft.utils.scale_points_by_norm(
                         torch_nfft.utils.shift_points_by_center(
-                            pos, source_batch=batch)[0],
-                        source_batch=batch,
+                            pos, batch=batch)[0],
+                        batch=batch,
                         norm="infinity" if p<0 else "euclidean")[0]
 
 y_true = torch_nfft.exact_gaussian_matrix(relative_sigma, pos_shifted_scaled, batch=batch)
