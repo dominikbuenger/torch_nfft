@@ -4,6 +4,7 @@ import math
 
 from .coeffs import gaussian_analytic_coeffs, gaussian_interpolated_coeffs
 from .utils import shift_points_by_center, scale_points_by_norm
+from .matrices import GramMatrix, AdjacencyMatrix
 
 
 class GaussianKernel:
