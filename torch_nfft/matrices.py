@@ -33,6 +33,8 @@ class AbstractMatrix:
     def column_sums(self):
         return self.T.row_sums()
 
+    def to_dense(self):
+        return self.apply(torch.eye(self.shape[0], device=self.device))
 
 
 class GramMatrix(AbstractMatrix):
