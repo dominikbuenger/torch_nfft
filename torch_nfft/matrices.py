@@ -73,7 +73,7 @@ class GramMatrix(AbstractMatrix):
 
 class AdjacencyMatrix(AbstractMatrix):
 
-    def __init__(self, gram_matrix, diagonal_offset=0, normalization=None):
+    def __init__(self, gram_matrix, diagonal_offset=0, normalization=None, degree_threshold=0):
 
         if not gram_matrix.is_symmetric():
             raise ValueError("The underlying Gram matrix of an AdjacencyMatrix must be symmetric")
@@ -88,6 +88,20 @@ class AdjacencyMatrix(AbstractMatrix):
             degrees = gram_matrix.row_sums()
             if diagonal_offset != 0:
                 degrees += diagonal_offset
+
+            negative_nodes = degrees < degree_threshold
+            if torch.any(negative_nodes):
+                import warnings
+                # Force warnings.warn() to omit the source code line in the message
+                formatwarning_orig = warnings.formatwarning
+                warnings.formatwarning = lambda message, category, filename, lineno, line=None: \
+                    formatwarning_orig(message, category, filename, lineno, line='')
+                warnings.warn("AdjacencyMatrix with normalization: {} out of {} node degrees are smaller than the threshold {:.4g}".format(
+                    torch.sum(negative_nodes), degrees.numel(), degree_threshold),
+                    RuntimeWarning, stacklevel=1)
+                warnings.formatwarning = formatwarning_orig
+
+                degrees[negative_nodes] = torch.inf
 
             # normalization == "rw" is a synonym for "left"
             if normalization == "rw":
