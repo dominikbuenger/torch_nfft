@@ -120,7 +120,7 @@ class GaussianKernel:
         return self.gram_matrix(*args, **kwargs)
 
 
-    def adjacency_matrix(self, sources, batch=None, loop_weight=1, normalization=None):
+    def adjacency_matrix(self, sources, batch=None, loop_weight=1, normalization=None, shift=None, degree_threshold=0):
         return AdjacencyMatrix(self.gram_matrix(sources, batch=batch),
                                 diagonal_offset=loop_weight-1,
-                                normalization=normalization)
+                                normalization=normalization, shift=shift, degree_threshold=degree_threshold)
